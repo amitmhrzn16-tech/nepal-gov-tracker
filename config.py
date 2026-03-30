@@ -136,6 +136,26 @@ NEWS_SOURCES = [
         "rss": "https://ictframe.com/feed/",
         "category": "tech"
     },
+
+    # ── Stock Market / NEPSE ──
+    {
+        "name": "ShareSansar",
+        "url": "https://www.sharesansar.com/category/latest",
+        "rss": None,
+        "category": "stock"
+    },
+    {
+        "name": "NepseAlpha",
+        "url": "https://nepsealpha.com/news",
+        "rss": None,
+        "category": "stock"
+    },
+    {
+        "name": "Merolagani",
+        "url": "https://merolagani.com/NewsList.aspx",
+        "rss": None,
+        "category": "stock"
+    },
 ]
 
 # ─── TRACKING TOPICS ─────────────────────────────────────────
