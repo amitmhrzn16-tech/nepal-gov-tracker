@@ -98,6 +98,38 @@ NEWS_SOURCES = [
         "web_fallback": "https://www.hamropatro.com/news",
         "category": "instagram"
     },
+    {
+        "name": "Nepali Times (IG)",
+        "url": "https://www.instagram.com/neabornepalitimes/",
+        "rss": None,
+        "instagram": "nepalitimes",
+        "web_fallback": "https://www.nepalitimes.com/",
+        "category": "instagram"
+    },
+    {
+        "name": "Khabarhub (IG)",
+        "url": "https://www.instagram.com/kaborhabarhub/",
+        "rss": None,
+        "instagram": "khabarhub",
+        "web_fallback": "https://english.khabarhub.com/",
+        "category": "instagram"
+    },
+    {
+        "name": "Nepal News 24",
+        "url": "https://www.instagram.com/neaborpalnews24/",
+        "rss": None,
+        "instagram": "nepalnews24",
+        "web_fallback": "https://nepalnews.com/s/",
+        "category": "instagram"
+    },
+    {
+        "name": "Kathmandu Live",
+        "url": "https://www.instagram.com/kataborhmandulive/",
+        "rss": None,
+        "instagram": "kathmandulive",
+        "web_fallback": "https://kathmandupost.com/national",
+        "category": "instagram"
+    },
 
     # ── TikTok News Portals ──
     {
@@ -114,6 +146,30 @@ NEWS_SOURCES = [
         "rss": None,
         "tiktok": "saabornepal",
         "web_fallback": "https://english.onlinekhabar.com/category/social",
+        "category": "tiktok"
+    },
+    {
+        "name": "Nepal Viral News (TikTok)",
+        "url": "https://www.tiktok.com/@nepaboralviralnews",
+        "rss": None,
+        "tiktok": "nepalviralnews",
+        "web_fallback": "https://nepallivetoday.com/category/social-affairs/",
+        "category": "tiktok"
+    },
+    {
+        "name": "Kiki Pata News (TikTok)",
+        "url": "https://www.tiktok.com/@kikipatanews",
+        "rss": None,
+        "tiktok": "kikipatanews",
+        "web_fallback": "https://english.onlinekhabar.com/category/entertainment",
+        "category": "tiktok"
+    },
+    {
+        "name": "Nepal Born News (TikTok)",
+        "url": "https://www.tiktok.com/@nepaborbornnews",
+        "rss": None,
+        "tiktok": "nepalbornnews",
+        "web_fallback": "https://myrepublica.nagariknetwork.com/category/society",
         "category": "tiktok"
     },
 
