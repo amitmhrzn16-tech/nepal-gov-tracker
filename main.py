@@ -156,7 +156,6 @@ def main():
     logger.info("=" * 60)
 
     # Start health check server in background thread
-    # (Railway needs an HTTP server to know the app is alive)
     health_thread = threading.Thread(target=start_health_server, daemon=True)
     health_thread.start()
 
