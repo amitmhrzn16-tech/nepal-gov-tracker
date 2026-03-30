@@ -1,0 +1,12 @@
+# Data files (generated at runtime)
+data/
+tracker.log
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# IDE
+.vscode/
+.idea/
