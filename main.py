@@ -93,17 +93,18 @@ def run_pipeline():
         logger.info(f"Found {len(articles)} new articles")
 
         # Step 2: Generate Report
-        logger.info("[2/3] Generating AI-powered report...")
+        logger.info("[2/4] Generating AI-powered report...")
         generator = ReportGenerator()
         report = generator.generate(articles)
         logger.info(f"Report generated: {report['subject']}")
 
-        # Step 3: Generate Audio Briefing
-        logger.info("[3/4] Generating audio briefing...")
+        # Step 3: Generate Detailed Audio Briefing
+        logger.info("[3/4] Generating detailed audio briefing...")
         audio_path = None
         if config.AUDIO_ENABLED:
             audio_gen = AudioGenerator(config.DATA_DIR)
-            ai_summary = report.get("plain_text", "")[:500]
+            # Pass the full AI summary for the detailed audio narration
+            ai_summary = report.get("ai_summary", "")
             audio_path = audio_gen.generate(ai_summary, articles)
             if audio_path:
                 logger.info(f"Audio ready: {audio_path}")

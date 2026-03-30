@@ -1,7 +1,7 @@
 """
 Nepal News Tracker — Audio News Generator
-Converts AI summary + headlines into an MP3 audio file using gTTS (free).
-Users can listen to the news briefing as a podcast-style audio note.
+Converts AI detailed report + all article summaries into a comprehensive
+MP3 audio briefing. Podcast-style narration covering every category.
 """
 
 import os
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class AudioGenerator:
-    """Generates MP3 audio of the news briefing using Google Text-to-Speech (free)."""
+    """Generates comprehensive MP3 audio briefing using Google Text-to-Speech (free)."""
 
     def __init__(self, data_dir: str = "data"):
         self.audio_dir = os.path.join(data_dir, "audio")
@@ -20,7 +20,7 @@ class AudioGenerator:
 
     def generate(self, ai_summary: str, articles: list[dict]) -> str | None:
         """
-        Generate an MP3 audio file of the news briefing.
+        Generate a detailed MP3 audio briefing.
         Returns the file path, or None on failure.
         """
         try:
@@ -30,22 +30,20 @@ class AudioGenerator:
             return None
 
         try:
-            # Build the spoken script
-            script = self._build_script(ai_summary, articles)
+            script = self._build_detailed_script(ai_summary, articles)
 
             if not script or len(script) < 50:
                 logger.warning("Script too short for audio generation")
                 return None
 
-            # Generate audio
-            logger.info(f"Generating audio ({len(script)} chars)...")
+            logger.info(f"Generating detailed audio ({len(script)} chars, ~{len(script)//150} sec)...")
             tts = gTTS(text=script, lang="en", slow=False)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filepath = os.path.join(self.audio_dir, f"briefing_{timestamp}.mp3")
             tts.save(filepath)
 
-            file_size = os.path.getsize(filepath) / 1024  # KB
+            file_size = os.path.getsize(filepath) / 1024
             logger.info(f"Audio generated: {filepath} ({file_size:.0f} KB)")
             return filepath
 
@@ -53,41 +51,60 @@ class AudioGenerator:
             logger.error(f"Audio generation failed: {type(e).__name__}: {e}")
             return None
 
-    def _build_script(self, ai_summary: str, articles: list[dict]) -> str:
-        """Build a natural-sounding spoken script from the news data."""
+    def _build_detailed_script(self, ai_summary: str, articles: list[dict]) -> str:
+        """Build a comprehensive podcast-style spoken script."""
         parts = []
 
-        # Intro
         now = datetime.now()
         time_str = now.strftime("%I:%M %p")
-        date_str = now.strftime("%B %d, %Y")
+        date_str = now.strftime("%A, %B %d, %Y")
+
+        # ── Intro ──
         parts.append(
             f"Nepal News Briefing. {date_str}, {time_str}. "
-            f"Here's your hourly news update."
+            f"Welcome to your comprehensive hourly news update. "
+            f"We have {len(articles)} stories across government, stock market, "
+            f"gold prices, technology, and social media. Let's get started."
         )
 
-        # AI Summary
+        # ── AI Detailed Report ──
         if ai_summary:
-            parts.append("First, the top summary.")
-            # Clean up markdown for speech
+            parts.append("Here is the AI-generated detailed report for this hour.")
             clean = ai_summary.replace("**", "").replace("*", "")
-            clean = clean.replace("#", "").replace("-", "").strip()
-            parts.append(clean)
+            clean = clean.replace("#", "").replace("-", " ").strip()
+            # Remove markdown-style headers but keep the text
+            lines = clean.split("\n")
+            for line in lines:
+                line = line.strip()
+                if line:
+                    parts.append(line)
+            parts.append("That was the overview. Now, let's go through each category in detail.")
 
-        # Category headlines
+        # ── Category-by-category detailed narration ──
         category_labels = {
             "government": "Government and Politics",
             "politics": "Government and Politics",
             "stock": "Stock Market and NEPSE",
             "gold": "Gold and Silver Prices",
             "tech": "Technology News",
-            "instagram": "Trending on Social Media",
+            "instagram": "Trending on Instagram",
             "tiktok": "Trending on TikTok",
-            "linkedin": "Business and LinkedIn News",
+            "linkedin": "Business and LinkedIn Updates",
             "general": "General News",
         }
 
-        # Group articles by category
+        category_intros = {
+            "government": "Starting with government and politics. Here are today's developments from Nepal's political landscape.",
+            "stock": "Moving to the stock market. Here's what's happening with NEPSE and the financial markets today.",
+            "gold": "Now for gold and silver prices. Here are today's precious metal rates in Nepal.",
+            "tech": "In technology news. Here are the latest tech developments from Nepal.",
+            "instagram": "Now, what's trending on Instagram. These stories are going viral on Nepal's social media.",
+            "tiktok": "Over on TikTok, here's what Nepal is talking about.",
+            "linkedin": "In business news from LinkedIn. Here are the economic and professional updates.",
+            "general": "And finally, some general news stories.",
+        }
+
+        # Group articles
         grouped = {}
         for a in articles:
             cat = a.get("category", "general")
@@ -96,30 +113,54 @@ class AudioGenerator:
             grouped.setdefault(cat, []).append(a)
 
         order = ["government", "stock", "gold", "tech", "instagram", "tiktok", "linkedin", "general"]
+
         for cat in order:
             items = grouped.get(cat, [])
             if not items:
                 continue
 
-            label = category_labels.get(cat, "Other News")
-            parts.append(f"Now, {label}.")
+            # Category intro
+            intro = category_intros.get(cat, f"Next, {category_labels.get(cat, 'other news')}.")
+            parts.append(intro)
 
-            for a in items[:4]:
-                title = a["title"][:120]
-                source = a.get("source", "")
-                summary = a.get("summary", "")[:100]
+            for i, a in enumerate(items):
+                title = a["title"][:150]
+                source = a.get("source", "Unknown")
+                summary = a.get("summary", "")[:250]
+                platform = a.get("platform", "")
+                social_url = a.get("social_url", "")
 
-                parts.append(f"From {source}: {title}.")
-                if summary and cat == "gold":
-                    parts.append(summary)
+                # Read the article
+                parts.append(f"From {source}.")
+                parts.append(f"{title}.")
 
-        # Outro
+                # Read summary if available
+                if summary:
+                    # Clean up summary for speech
+                    clean_summary = summary.replace("|", ", ").replace("\n", " ").strip()
+                    if len(clean_summary) > 20:
+                        parts.append(clean_summary)
+
+                # Mention social media source
+                if platform in ("instagram", "tiktok") and social_url:
+                    parts.append(
+                        f"You can also find this on {platform.capitalize()}."
+                    )
+
+            # Category transition
+            parts.append("")  # Small pause between categories
+
+        # ── Outro ──
+        article_count = len(articles)
+        cat_count = len([c for c in order if c in grouped])
         parts.append(
-            "That's your Nepal news briefing. "
-            "The next update will arrive in one hour. Stay informed."
+            f"That concludes today's Nepal News Briefing. "
+            f"We covered {article_count} stories across {cat_count} categories. "
+            f"Your next briefing will arrive in one hour. "
+            f"Stay informed, stay ahead. Thank you for listening."
         )
 
-        return " ".join(parts)
+        return " ".join(p for p in parts if p)
 
     def cleanup_old(self, keep_latest: int = 5):
         """Remove old audio files, keeping only the latest N."""

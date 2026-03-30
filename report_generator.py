@@ -104,25 +104,49 @@ class ReportGenerator:
             "timestamp": timestamp,
             "article_count": len(articles),
             "articles": articles,
+            "ai_summary": ai_summary,  # Raw AI text for audio generator
             "plain_text": self._to_plain(ai_summary, grouped, timestamp),
             "html": self._to_html(ai_summary, grouped, timestamp, len(articles)),
             "slack_blocks": self._to_slack(ai_summary, grouped, timestamp, len(articles)),
         }
 
     def _get_ai_summary(self, articles: list[dict]) -> str:
-        """Get AI-generated headline summary."""
+        """Get AI-generated detailed news report."""
         articles_text = self._format_articles_for_prompt(articles)
-        prompt = f"""You are a Nepal news analyst. Analyze these articles and write a SHORT executive summary (4-5 sentences max) covering the most important developments today across government, economy, gold prices, tech, and stock market.
+        prompt = f"""You are a senior Nepal news analyst delivering a detailed daily briefing. Analyze ALL of these articles and write a comprehensive report.
 
 ARTICLES:
 {articles_text}
 
+Structure your report EXACTLY like this:
+
+**TOP STORY**
+Write 2-3 sentences about the single most important news of the day.
+
+**GOVERNMENT & POLITICS**
+Summarize all government/politics developments in 3-4 sentences. Name key figures and decisions.
+
+**STOCK MARKET & NEPSE**
+Summarize NEPSE performance, key movers, and market sentiment in 2-3 sentences with numbers.
+
+**GOLD & SILVER PRICES**
+Report exact prices if available. Compare with trends.
+
+**TECH NEWS**
+Summarize tech developments in 2-3 sentences.
+
+**TRENDING ON SOCIAL MEDIA**
+Summarize what's viral on Instagram/TikTok in Nepal in 2-3 sentences.
+
+**BUSINESS & LINKEDIN**
+Summarize any business/economy developments in 1-2 sentences.
+
 Rules:
-- Maximum 5 sentences
-- Cover the top highlights across all categories
-- Mention exact gold prices if available
-- Be factual, cite source names
-- Professional tone"""
+- Be factual, cite source names in parentheses
+- Include specific numbers, prices, percentages where available
+- Skip any section that has no articles
+- Professional but engaging tone
+- Total length: 250-400 words"""
 
         try:
             if not self.client:
@@ -164,11 +188,15 @@ Rules:
         # AI Summary section
         if ai_summary:
             summary_html = (
-                f'<div style="background:#f0f4ff;border-left:4px solid #6c5ce7;padding:16px 20px;'
+                f'<div style="background:#f0f4ff;border-left:4px solid #6c5ce7;padding:18px 20px;'
                 f'margin:0 0 24px;border-radius:0 8px 8px 0;">'
-                f'<h3 style="margin:0 0 8px;color:#6c5ce7;font-size:14px;">AI Summary</h3>'
-                f'<p style="margin:0;color:#333;line-height:1.7;font-size:14px;">'
-                f'{self._md_to_html_inline(ai_summary)}</p></div>'
+                f'<h3 style="margin:0 0 10px;color:#6c5ce7;font-size:15px;">'
+                f'&#x1F9E0; AI Detailed Report</h3>'
+                f'<div style="margin:0;color:#333;line-height:1.8;font-size:13px;">'
+                f'{self._md_to_html_inline(ai_summary)}</div>'
+                f'<div style="margin-top:12px;padding-top:10px;border-top:1px solid #ddd;'
+                f'font-size:11px;color:#888;">&#x1F50A; Audio briefing attached — listen to this report</div>'
+                f'</div>'
             )
         else:
             summary_html = ""
@@ -193,26 +221,59 @@ Rules:
                 f'</div></div>\n'
             )
 
-            # News cards — show ALL articles
+            # News cards — show ALL articles with social media links
             for a in items:
                 url = a.get("full_article_url", a["url"])
-                summary = a.get("summary", "")[:120]
+                summary = a.get("summary", "")[:200]
                 source = a.get("source", "")
-                ig_url = a.get("instagram_url", "")
+                social_url = a.get("social_url", "")
+                platform = a.get("platform", "")
 
-                summary_text = f'<p style="margin:6px 0 8px;color:#666;font-size:12px;line-height:1.5;">{summary}</p>' if summary else ""
-                ig_badge = (f'<span style="color:#E1306C;font-size:10px;margin-left:6px;">IG</span>') if ig_url else ""
+                summary_text = f'<p style="margin:6px 0 8px;color:#555;font-size:12px;line-height:1.6;">{summary}</p>' if summary else ""
+
+                # Build social media badge + link
+                social_badge = ""
+                if platform == "instagram" or social_url and "instagram.com" in social_url:
+                    social_badge = (
+                        f'<a href="{social_url}" style="display:inline-block;background:#E1306C;color:white;'
+                        f'font-size:10px;padding:2px 8px;border-radius:10px;text-decoration:none;'
+                        f'margin-left:6px;vertical-align:middle;">&#x1F4F7; Instagram</a>'
+                    )
+                elif platform == "tiktok" or social_url and "tiktok.com" in social_url:
+                    social_badge = (
+                        f'<a href="{social_url}" style="display:inline-block;background:#010101;color:white;'
+                        f'font-size:10px;padding:2px 8px;border-radius:10px;text-decoration:none;'
+                        f'margin-left:6px;vertical-align:middle;">&#x1F3B5; TikTok</a>'
+                    )
+                elif platform == "linkedin" or social_url and "linkedin.com" in social_url:
+                    social_badge = (
+                        f'<a href="{social_url}" style="display:inline-block;background:#0077b5;color:white;'
+                        f'font-size:10px;padding:2px 8px;border-radius:10px;text-decoration:none;'
+                        f'margin-left:6px;vertical-align:middle;">&#x1F4BC; LinkedIn</a>'
+                    )
+
+                # Build social view link separately (can't use backslash in f-string)
+                social_link = ""
+                if social_url and platform:
+                    plat_name = platform.capitalize()
+                    social_link = (
+                        f'<a href="{social_url}" style="color:#E1306C;text-decoration:none;'
+                        f'font-size:12px;">View on {plat_name} &#x2192;</a>'
+                    )
 
                 sections_html += (
                     f'<div style="background:#fff;border:1px solid #eee;border-radius:8px;'
                     f'padding:14px 16px;margin:8px 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">'
                     f'<div style="font-size:14px;font-weight:600;color:#1a1a2e;line-height:1.4;">'
-                    f'{a["title"][:100]}</div>'
+                    f'{a["title"][:120]}</div>'
                     f'<div style="font-size:11px;color:#999;margin-top:4px;">'
-                    f'{source}{ig_badge}</div>'
+                    f'{source}{social_badge}</div>'
                     f'{summary_text}'
+                    f'<div style="margin-top:6px;">'
                     f'<a href="{url}" style="color:#6c5ce7;text-decoration:none;'
-                    f'font-size:12px;font-weight:500;">Read full article &#x2192;</a>'
+                    f'font-size:12px;font-weight:500;margin-right:12px;">Read full article &#x2192;</a>'
+                    f'{social_link}'
+                    f'</div>'
                     f'</div>\n'
                 )
 
@@ -234,7 +295,7 @@ Rules:
       <span style="background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:12px;font-size:11px;margin:0 3px;">&#x1F3B5; TikTok</span>
       <span style="background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:12px;font-size:11px;margin:0 3px;">&#x1F4BC; LinkedIn</span>
     </div>
-    <p style="margin:10px 0 0;opacity:0.6;font-size:12px;">{count} articles analyzed from 19 sources</p>
+    <p style="margin:10px 0 0;opacity:0.6;font-size:12px;">{count} articles analyzed from 29 sources</p>
   </div>
 
   <!-- Content -->
@@ -275,12 +336,16 @@ Rules:
 
             for a in items:
                 url = a.get("full_article_url", a["url"])
-                summary = a.get("summary", "")[:120]
-                lines.append(f"\n  {a['title'][:90]}")
+                summary = a.get("summary", "")[:150]
+                social_url = a.get("social_url", "")
+                platform = a.get("platform", "")
+                lines.append(f"\n  {a['title'][:100]}")
                 lines.append(f"  Source: {a.get('source', '')}")
                 if summary:
                     lines.append(f"  {summary}")
                 lines.append(f"  Read: {url}")
+                if social_url and platform:
+                    lines.append(f"  {platform.capitalize()}: {social_url}")
 
         return "\n".join(lines)
 
@@ -316,9 +381,13 @@ Rules:
             text = f"*{emoji} {cfg['label']}*\n"
             for a in items:
                 url = a.get("full_article_url", a["url"])
-                summary = a.get("summary", "")[:80]
-                text += f"\n> *<{url}|{a['title'][:70]}>*"
+                summary = a.get("summary", "")[:100]
+                social_url = a.get("social_url", "")
+                platform = a.get("platform", "")
+                text += f"\n> *<{url}|{a['title'][:80]}>*"
                 text += f"\n> _{a.get('source', '')}_"
+                if social_url and platform:
+                    text += f" | <{social_url}|View on {platform.capitalize()}>"
                 if summary:
                     text += f"\n> {summary}"
                 text += "\n"
