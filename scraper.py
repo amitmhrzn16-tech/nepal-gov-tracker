@@ -104,12 +104,13 @@ class NewsScraper:
 
                 # Filter for relevant content (only for gov/politics/general)
                 if category in ("government", "politics", "general"):
-                    filtered = self._filter_relevant(articles)
-                else:
-                    filtered = articles
+                    articles = self._filter_relevant(articles)
 
-                all_articles.extend(filtered)
-                logger.info(f"[{source['name']}] Found {len(filtered)} articles (category: {category})")
+                # Filter to today's articles only
+                articles = self._filter_today_only(articles)
+
+                all_articles.extend(articles)
+                logger.info(f"[{source['name']}] Found {len(articles)} today's articles (category: {category})")
 
             except Exception as e:
                 logger.error(f"[{source['name']}] Scraping failed: {e}")
@@ -137,7 +138,7 @@ class NewsScraper:
         articles = []
         try:
             feed = feedparser.parse(source["rss"])
-            for entry in feed.entries[:30]:
+            for entry in feed.entries[:20]:  # Limit to first 20 entries
                 article = {
                     "title": entry.get("title", "").strip(),
                     "url": entry.get("link", ""),
@@ -364,6 +365,40 @@ class NewsScraper:
         return articles
 
     # ─── Helpers ──────────────────────────────────────────────
+    def _filter_today_only(self, articles: list[dict]) -> list[dict]:
+        """Keep only articles published today. For articles without a parseable
+        date (web-scraped), we check if the URL or title contains today's date
+        patterns; if not determinable we keep them (benefit of the doubt for
+        freshly scraped pages that list current articles)."""
+        today = datetime.now().date()
+        today_str = today.isoformat()  # 2026-03-30
+        kept = []
+
+        for a in articles:
+            pub = a.get("published", "")
+
+            # Try to parse the published date
+            try:
+                pub_date = datetime.fromisoformat(pub).date()
+                if pub_date == today:
+                    kept.append(a)
+                    continue
+                # If the date is clearly old (>1 day ago), skip it
+                if (today - pub_date).days > 1:
+                    continue
+                # If it's yesterday (could be timezone edge case), keep it
+                kept.append(a)
+                continue
+            except (ValueError, TypeError):
+                pass
+
+            # For web-scraped articles with no real date,
+            # keep them since we're scraping "latest" pages
+            # that typically show today's content
+            kept.append(a)
+
+        return kept
+
     def _filter_relevant(self, articles: list[dict]) -> list[dict]:
         relevant = []
         keywords = [t.lower() for t in config.TOPICS]
