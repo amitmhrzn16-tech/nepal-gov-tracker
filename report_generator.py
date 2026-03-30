@@ -16,6 +16,15 @@ class ReportGenerator:
     """Generates AI-powered news reports using Claude."""
 
     def __init__(self):
+        # Log API key status for debugging
+        key = config.ANTHROPIC_API_KEY
+        if key == "your-anthropic-api-key" or not key:
+            logger.error("ANTHROPIC_API_KEY is NOT set! Add it to Railway Variables.")
+        else:
+            masked = key[:10] + "..." + key[-4:]
+            logger.info(f"Anthropic API key loaded: {masked}")
+            logger.info(f"Using model: {config.CLAUDE_MODEL}")
+
         self.client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
     def generate(self, articles: list[dict]) -> dict:
@@ -50,14 +59,20 @@ Rules:
 - Use professional, neutral tone"""
 
         try:
+            logger.info(f"Calling Claude API (model: {config.CLAUDE_MODEL})...")
             response = self.client.messages.create(
                 model=config.CLAUDE_MODEL,
                 max_tokens=1500,
                 messages=[{"role": "user", "content": prompt}]
             )
             report_text = response.content[0].text
+            logger.info(f"Claude API success! Report length: {len(report_text)} chars")
         except Exception as e:
-            logger.error(f"Claude API error: {e}")
+            logger.error(f"CLAUDE API FAILED: {type(e).__name__}: {e}")
+            logger.error("Possible fixes:\n"
+                        "  1. Check ANTHROPIC_API_KEY is correct in Railway Variables\n"
+                        "  2. Make sure your API account has credits at console.anthropic.com\n"
+                        "  3. The key should start with 'sk-ant-'")
             report_text = self._fallback_report(articles)
 
         subject = f"Nepal Gov Update — {timestamp}"

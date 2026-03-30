@@ -8,7 +8,8 @@ import os
 # ─── ANTHROPIC (Claude AI for summarization) ───────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "your-anthropic-api-key")
 # Get from https://console.anthropic.com
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
+# Safe default that works on all API plans
 
 # ─── EMAIL SETTINGS (Gmail SMTP) ──────────────────────────────
 EMAIL_ENABLED = True
