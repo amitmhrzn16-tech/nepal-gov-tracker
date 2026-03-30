@@ -27,15 +27,16 @@ SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/serv
 # → Create at https://api.slack.com/messaging/webhooks
 
 # ─── SCHEDULER ────────────────────────────────────────────────
-RUN_INTERVAL_MINUTES = 60  # How often to check for news (default: every hour)
+RUN_INTERVAL_MINUTES = int(os.getenv("RUN_INTERVAL_MINUTES", "60"))
 
 # ─── NEWS SOURCES ─────────────────────────────────────────────
 NEWS_SOURCES = [
+    # ── Government & Politics ──
     {
         "name": "The Kathmandu Post",
         "url": "https://kathmandupost.com/national",
         "rss": "https://kathmandupost.com/rss",
-        "category": "general"
+        "category": "government"
     },
     {
         "name": "Republica",
@@ -47,10 +48,10 @@ NEWS_SOURCES = [
         "name": "The Himalayan Times",
         "url": "https://thehimalayantimes.com/nepal",
         "rss": "https://thehimalayantimes.com/feed",
-        "category": "general"
+        "category": "government"
     },
     {
-        "name": "Nepal News (English)",
+        "name": "Online Khabar (English)",
         "url": "https://english.onlinekhabar.com/category/government",
         "rss": "https://english.onlinekhabar.com/feed",
         "category": "government"
@@ -61,26 +62,108 @@ NEWS_SOURCES = [
         "rss": "https://en.setopati.com/feed",
         "category": "politics"
     },
+    {
+        "name": "RSS Nepal (National News Agency)",
+        "url": "https://www.rssnepal.com/",
+        "rss": None,
+        "category": "government"
+    },
+
+    # ── Instagram News Portals ──
+    {
+        "name": "Routine of Nepal Banda (RONB)",
+        "url": "https://www.instagram.com/routineofnepalbanda/",
+        "rss": None,
+        "instagram": "routineofnepalbanda",
+        "web_fallback": "https://english.onlinekhabar.com/",
+        "category": "instagram"
+    },
+    {
+        "name": "Nepal Live Today",
+        "url": "https://www.instagram.com/nepallivetoday/",
+        "rss": None,
+        "instagram": "nepallivetoday",
+        "web_fallback": "https://nepallivetoday.com/",
+        "category": "instagram"
+    },
+    {
+        "name": "Hamro Patro News",
+        "url": "https://www.instagram.com/hamaboropatroofficial/",
+        "rss": None,
+        "instagram": "hamropatroofficial",
+        "web_fallback": "https://www.hamropatro.com/news",
+        "category": "instagram"
+    },
+
+    # ── Gold & Silver Prices ──
+    {
+        "name": "Nepal Gold Price (Ashesh)",
+        "url": "https://www.ashesh.com.np/gold/",
+        "rss": None,
+        "category": "gold",
+        "scrape_type": "gold_price"
+    },
+    {
+        "name": "NepseAlpha Gold",
+        "url": "https://nepsealpha.com/gold-price",
+        "rss": None,
+        "category": "gold",
+        "scrape_type": "gold_price"
+    },
+
+    # ── Tech News ──
+    {
+        "name": "Gadgets In Nepal",
+        "url": "https://gadgetsinnepal.com.np/",
+        "rss": "https://gadgetsinnepal.com.np/feed/",
+        "category": "tech"
+    },
+    {
+        "name": "Techmandu",
+        "url": "https://techmandu.com/",
+        "rss": "https://techmandu.com/feed/",
+        "category": "tech"
+    },
+    {
+        "name": "TechPana",
+        "url": "https://www.techpana.com/",
+        "rss": "https://www.techpana.com/feed/",
+        "category": "tech"
+    },
+    {
+        "name": "ICT Frame",
+        "url": "https://ictframe.com/",
+        "rss": "https://ictframe.com/feed/",
+        "category": "tech"
+    },
 ]
 
 # ─── TRACKING TOPICS ─────────────────────────────────────────
 TOPICS = [
-    "nepal government",
-    "nepal parliament",
-    "nepal prime minister",
-    "nepal cabinet",
-    "nepal budget",
-    "nepal economy",
-    "nepal policy",
-    "nepal legislation",
-    "nepal ministry",
-    "nepal election",
-    "nepal foreign affairs",
-    "nepal trade",
-    "nepal political party",
+    # Government & Politics
+    "nepal government", "nepal parliament", "nepal prime minister",
+    "nepal cabinet", "nepal budget", "nepal economy",
+    "nepal policy", "nepal legislation", "nepal ministry",
+    "nepal election", "nepal foreign affairs", "nepal trade",
+    "nepal political party", "nepal supreme court",
+    # Gold & Economy
+    "gold price", "gold rate", "silver price", "nepal rastra bank",
+    "exchange rate", "remittance", "nepse", "stock market",
+    # Tech
+    "tech", "startup", "digital nepal", "internet", "telecom",
+    "ntc", "ncell", "smartphone", "app", "ai", "fintech",
 ]
 
+# ─── INSTAGRAM SCRAPING ─────────────────────────────────────
+# Instagram doesn't allow direct scraping, so we use web fallbacks
+# and search for RONB-style content from their linked websites
+INSTAGRAM_ENABLED = True
+
+# ─── GOLD PRICE SETTINGS ────────────────────────────────────
+GOLD_ENABLED = True
+GOLD_API_URL = os.getenv("GOLD_API_URL", "https://www.ashesh.com.np/gold/")
+
 # ─── REPORT SETTINGS ─────────────────────────────────────────
-MAX_ARTICLES_PER_REPORT = 20
+MAX_ARTICLES_PER_REPORT = 30  # Increased for more categories
 REPORT_LANGUAGE = "english"
-DATA_DIR = "data"  # Where to store scraped articles and history
+DATA_DIR = "data"
