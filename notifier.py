@@ -1,14 +1,17 @@
 """
 Nepal Government News Tracker — Email & Slack Notification Module
-Sends reports via Gmail SMTP and Slack Webhooks.
+Sends reports via Gmail SMTP (with audio attachment) and Slack Webhooks.
 """
 
 import json
 import logging
+import os
 import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 import requests
 
 import config
@@ -17,9 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 class EmailNotifier:
-    """Sends HTML email reports via Gmail SMTP."""
+    """Sends HTML email reports via Gmail SMTP with optional audio attachment."""
 
-    def send(self, report: dict) -> bool:
+    def send(self, report: dict, audio_path: str = None) -> bool:
         if not config.EMAIL_ENABLED:
             logger.info("Email notifications disabled in config")
             return False
@@ -32,14 +35,34 @@ class EmailNotifier:
                      f"Recipients: {config.EMAIL_RECIPIENTS}")
 
         try:
-            msg = MIMEMultipart("alternative")
+            msg = MIMEMultipart("mixed")
             msg["Subject"] = report["subject"]
             msg["From"] = config.EMAIL_SENDER
             msg["To"] = ", ".join(config.EMAIL_RECIPIENTS)
 
-            # Attach both plain text and HTML versions
-            msg.attach(MIMEText(report["plain_text"], "plain", "utf-8"))
-            msg.attach(MIMEText(report["html"], "html", "utf-8"))
+            # Create alternative part for text/html
+            alt_part = MIMEMultipart("alternative")
+            alt_part.attach(MIMEText(report["plain_text"], "plain", "utf-8"))
+            alt_part.attach(MIMEText(report["html"], "html", "utf-8"))
+            msg.attach(alt_part)
+
+            # Attach audio file if available
+            if audio_path and os.path.exists(audio_path):
+                try:
+                    with open(audio_path, "rb") as audio_file:
+                        audio_attachment = MIMEBase("audio", "mpeg")
+                        audio_attachment.set_payload(audio_file.read())
+                        encoders.encode_base64(audio_attachment)
+                        filename = os.path.basename(audio_path)
+                        audio_attachment.add_header(
+                            "Content-Disposition",
+                            f"attachment; filename=\"Nepal_News_Briefing.mp3\""
+                        )
+                        msg.attach(audio_attachment)
+                        file_size = os.path.getsize(audio_path) / 1024
+                        logger.info(f"Audio attached: {filename} ({file_size:.0f} KB)")
+                except Exception as e:
+                    logger.error(f"Failed to attach audio: {e}")
 
             # Use SSL context for secure connection
             context = ssl.create_default_context()

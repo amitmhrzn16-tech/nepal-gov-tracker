@@ -20,6 +20,7 @@ import config
 from scraper import NewsScraper
 from report_generator import ReportGenerator
 from notifier import EmailNotifier, SlackNotifier
+from audio_generator import AudioGenerator
 
 # ─── Logging Setup ────────────────────────────────────────────
 logging.basicConfig(
@@ -97,13 +98,24 @@ def run_pipeline():
         report = generator.generate(articles)
         logger.info(f"Report generated: {report['subject']}")
 
-        # Step 3: Send Notifications
-        logger.info("[3/3] Sending notifications...")
+        # Step 3: Generate Audio Briefing
+        logger.info("[3/4] Generating audio briefing...")
+        audio_path = None
+        if config.AUDIO_ENABLED:
+            audio_gen = AudioGenerator(config.DATA_DIR)
+            ai_summary = report.get("plain_text", "")[:500]
+            audio_path = audio_gen.generate(ai_summary, articles)
+            if audio_path:
+                logger.info(f"Audio ready: {audio_path}")
+            audio_gen.cleanup_old(keep_latest=5)
+
+        # Step 4: Send Notifications
+        logger.info("[4/4] Sending notifications...")
 
         email_notifier = EmailNotifier()
         slack_notifier = SlackNotifier()
 
-        email_ok = email_notifier.send(report)
+        email_ok = email_notifier.send(report, audio_path=audio_path)
         slack_ok = slack_notifier.send(report)
 
         # Save report locally as backup

@@ -46,10 +46,22 @@ CATEGORY_CONFIG = {
         "bg": "#e0f7e9",
     },
     "instagram": {
-        "label": "Trending (Social Media)",
-        "icon": "&#x1F4F1;",
+        "label": "Trending (Instagram)",
+        "icon": "&#x1F4F7;",
         "color": "#e84393",
         "bg": "#fce4ec",
+    },
+    "tiktok": {
+        "label": "Trending (TikTok)",
+        "icon": "&#x1F3B5;",
+        "color": "#010101",
+        "bg": "#e8e8e8",
+    },
+    "linkedin": {
+        "label": "Business (LinkedIn)",
+        "icon": "&#x1F4BC;",
+        "color": "#0077b5",
+        "bg": "#e1f0fa",
     },
     "general": {
         "label": "General News",
@@ -164,7 +176,7 @@ Rules:
         # Build category sections with news cards
         sections_html = ""
         # Define display order
-        order = ["government", "stock", "gold", "tech", "instagram", "general"]
+        order = ["government", "stock", "gold", "tech", "instagram", "tiktok", "linkedin", "general"]
         for cat in order:
             items = grouped.get(cat, [])
             if not items:
@@ -219,6 +231,8 @@ Rules:
       <span style="background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:12px;font-size:11px;margin:0 3px;">&#x1F4BB; Tech</span>
       <span style="background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:12px;font-size:11px;margin:0 3px;">&#x1F4C8; Stock</span>
       <span style="background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:12px;font-size:11px;margin:0 3px;">&#x1F4F1; Social</span>
+      <span style="background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:12px;font-size:11px;margin:0 3px;">&#x1F3B5; TikTok</span>
+      <span style="background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:12px;font-size:11px;margin:0 3px;">&#x1F4BC; LinkedIn</span>
     </div>
     <p style="margin:10px 0 0;opacity:0.6;font-size:12px;">{count} articles analyzed from 19 sources</p>
   </div>
@@ -248,7 +262,7 @@ Rules:
         if ai_summary:
             lines.append(f"\nAI SUMMARY:\n{ai_summary}\n")
 
-        order = ["government", "stock", "gold", "tech", "instagram", "general"]
+        order = ["government", "stock", "gold", "tech", "instagram", "tiktok", "linkedin", "general"]
         for cat in order:
             items = grouped.get(cat, [])
             if not items:
@@ -284,10 +298,11 @@ Rules:
                 "text": f"*:brain: AI Summary*\n{ai_summary[:500]}"}})
             blocks.append({"type": "divider"})
 
-        order = ["government", "stock", "gold", "tech", "instagram", "general"]
+        order = ["government", "stock", "gold", "tech", "instagram", "tiktok", "linkedin", "general"]
         emojis = {
             "government": ":classical_building:", "stock": ":chart_with_upwards_trend:",
             "gold": ":coin:", "tech": ":computer:", "instagram": ":camera:",
+            "tiktok": ":musical_note:", "linkedin": ":briefcase:",
             "general": ":newspaper:",
         }
 

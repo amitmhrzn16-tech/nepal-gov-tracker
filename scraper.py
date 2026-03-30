@@ -1,6 +1,7 @@
 """
 Nepal Government News Tracker — News Scraper Module
-Scrapes RSS feeds, web sources, Instagram fallbacks, and gold prices.
+Scrapes RSS feeds, web sources, Instagram/TikTok/LinkedIn fallbacks,
+gold prices, stock news, and tech news.
 """
 
 import os
@@ -89,20 +90,26 @@ class NewsScraper:
                 if scrape_type == "gold_price" and config.GOLD_ENABLED:
                     articles = self._scrape_gold_price(source)
                 elif category == "instagram" and config.INSTAGRAM_ENABLED:
-                    articles = self._scrape_instagram_fallback(source)
+                    articles = self._scrape_social_fallback(source, "instagram")
+                elif category == "tiktok":
+                    articles = self._scrape_social_fallback(source, "tiktok")
+                elif category == "linkedin":
+                    articles = self._scrape_social_fallback(source, "linkedin")
+                elif category == "stock":
+                    articles = self._scrape_stock(source)
                 elif source.get("rss"):
                     articles = self._scrape_rss(source)
                 else:
                     articles = self._scrape_web(source)
 
-                # Filter for relevant content (skip for gold/tech/instagram)
+                # Filter for relevant content (only for gov/politics/general)
                 if category in ("government", "politics", "general"):
                     filtered = self._filter_relevant(articles)
                 else:
                     filtered = articles
 
                 all_articles.extend(filtered)
-                logger.info(f"[{source['name']}] Found {len(filtered)} articles")
+                logger.info(f"[{source['name']}] Found {len(filtered)} articles (category: {category})")
 
             except Exception as e:
                 logger.error(f"[{source['name']}] Scraping failed: {e}")
@@ -116,7 +123,13 @@ class NewsScraper:
 
         self.store.cleanup_old(days=7)
 
-        logger.info(f"Total new articles: {len(new_articles)}")
+        # Log category breakdown
+        cats = {}
+        for a in new_articles:
+            c = a.get("category", "general")
+            cats[c] = cats.get(c, 0) + 1
+        logger.info(f"Total new articles: {len(new_articles)} | Breakdown: {cats}")
+
         return new_articles[:config.MAX_ARTICLES_PER_REPORT]
 
     # ─── RSS Scraping ─────────────────────────────────────────
@@ -140,7 +153,7 @@ class NewsScraper:
             logger.error(f"RSS parse error for {source['name']}: {e}")
         return articles
 
-    # ─── Web Scraping ─────────────────────────────────────────
+    # ─── Web Scraping (generic) ──────────────────────────────
     def _scrape_web(self, source: dict) -> list[dict]:
         articles = []
         try:
@@ -172,15 +185,78 @@ class NewsScraper:
             logger.error(f"Web scrape error for {source['name']}: {e}")
         return articles
 
-    # ─── Instagram Fallback (scrape their web presence) ───────
-    def _scrape_instagram_fallback(self, source: dict) -> list[dict]:
+    # ─── Stock Market Scraping ───────────────────────────────
+    def _scrape_stock(self, source: dict) -> list[dict]:
+        """Scrape stock/NEPSE news with better selectors for finance sites."""
+        articles = []
+        try:
+            resp = self.session.get(source["url"], timeout=15)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            seen_urls = set()
+
+            # Strategy 1: Look for headlines in h2, h3, h4, h5 tags
+            for tag in soup.find_all(["h1", "h2", "h3", "h4", "h5"], limit=60):
+                link = tag.find("a")
+                if not link or not link.get("href"):
+                    continue
+                title_text = link.get_text(strip=True)
+                href = link["href"]
+                if not title_text or len(title_text) < 15:
+                    continue
+                if href.startswith("/"):
+                    href = urljoin(source["url"], href)
+                if not href.startswith("http") or href in seen_urls:
+                    continue
+                seen_urls.add(href)
+                articles.append({
+                    "title": title_text[:200],
+                    "url": href,
+                    "summary": "",
+                    "published": datetime.now().isoformat(),
+                    "source": source["name"],
+                    "category": "stock",
+                    "full_article_url": href,
+                })
+
+            # Strategy 2: Fallback — look for article-like link blocks
+            if len(articles) < 3:
+                for tag in soup.find_all("a", href=True):
+                    title_text = tag.get_text(strip=True)
+                    href = tag["href"]
+                    if not title_text or len(title_text) < 25:
+                        continue
+                    if href.startswith("/"):
+                        href = urljoin(source["url"], href)
+                    if not href.startswith("http") or href in seen_urls:
+                        continue
+                    # Filter for news-like URLs
+                    if any(kw in href.lower() for kw in ["news", "article", "post", "detail", "story"]):
+                        seen_urls.add(href)
+                        articles.append({
+                            "title": title_text[:200],
+                            "url": href,
+                            "summary": "",
+                            "published": datetime.now().isoformat(),
+                            "source": source["name"],
+                            "category": "stock",
+                            "full_article_url": href,
+                        })
+
+            logger.info(f"[{source['name']}] Stock news: {len(articles)} articles found")
+        except Exception as e:
+            logger.error(f"Stock scrape error for {source['name']}: {e}")
+        return articles[:10]
+
+    # ─── Social Media Fallback (Instagram, TikTok, LinkedIn) ─
+    def _scrape_social_fallback(self, source: dict, platform: str) -> list[dict]:
         """
-        Instagram blocks direct scraping, so we scrape the linked
-        website/web fallback for RONB-style news portals.
+        Social platforms block direct scraping, so we scrape their
+        linked website/web fallback for trending content.
         """
         articles = []
         web_url = source.get("web_fallback", "")
-        ig_handle = source.get("instagram", "")
+        handle = source.get(platform, source.get("instagram", ""))
 
         if not web_url:
             logger.info(f"[{source['name']}] No web fallback, skipping")
@@ -191,7 +267,7 @@ class NewsScraper:
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
 
-            # Look for article headlines in h2, h3, h4 tags
+            # Look for article headlines in heading tags
             seen_urls = set()
             for tag in soup.find_all(["h2", "h3", "h4"], limit=50):
                 link = tag.find("a")
@@ -209,20 +285,33 @@ class NewsScraper:
                     continue
 
                 seen_urls.add(href)
+
+                # Try to get a snippet/summary from sibling or parent
+                summary = ""
+                parent = tag.find_parent(["article", "div"])
+                if parent:
+                    p_tag = parent.find("p")
+                    if p_tag:
+                        summary = p_tag.get_text(strip=True)[:150]
+
+                platform_label = platform.capitalize()
+                handle_str = f"@{handle}" if isinstance(handle, str) else ""
+
                 articles.append({
                     "title": title_text[:200],
                     "url": href,
-                    "summary": "",
+                    "summary": summary,
                     "published": datetime.now().isoformat(),
-                    "source": f"{source['name']} (@{ig_handle})",
-                    "category": "instagram",
+                    "source": f"{source['name']}" + (f" ({handle_str})" if handle_str else ""),
+                    "category": platform,  # Keep original platform category
                     "full_article_url": href,
-                    "instagram_url": f"https://www.instagram.com/{ig_handle}/",
+                    "social_url": source.get("url", ""),
+                    "platform": platform,
                 })
 
-            logger.info(f"[{source['name']}] Scraped {len(articles)} from web fallback")
+            logger.info(f"[{source['name']}] {platform.upper()} fallback: {len(articles)} articles")
         except Exception as e:
-            logger.error(f"Instagram fallback error for {source['name']}: {e}")
+            logger.error(f"{platform.capitalize()} fallback error for {source['name']}: {e}")
 
         return articles[:10]
 

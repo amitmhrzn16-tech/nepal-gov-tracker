@@ -26,6 +26,10 @@ SLACK_ENABLED = True
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/YOUR/WEBHOOK/URL")
 # → Create at https://api.slack.com/messaging/webhooks
 
+# ─── AUDIO TTS ────────────────────────────────────────────────
+AUDIO_ENABLED = True
+# Uses gTTS (Google Text-to-Speech) — completely free, no API key needed
+
 # ─── SCHEDULER ────────────────────────────────────────────────
 RUN_INTERVAL_MINUTES = int(os.getenv("RUN_INTERVAL_MINUTES", "60"))
 
@@ -88,11 +92,47 @@ NEWS_SOURCES = [
     },
     {
         "name": "Hamro Patro News",
-        "url": "https://www.instagram.com/hamaboropatroofficial/",
+        "url": "https://www.instagram.com/hamropatroofficial/",
         "rss": None,
         "instagram": "hamropatroofficial",
         "web_fallback": "https://www.hamropatro.com/news",
         "category": "instagram"
+    },
+
+    # ── TikTok News Portals ──
+    {
+        "name": "RONB TikTok",
+        "url": "https://www.tiktok.com/@routineofnepalbanda",
+        "rss": None,
+        "tiktok": "routineofnepalbanda",
+        "web_fallback": "https://english.onlinekhabar.com/trending",
+        "category": "tiktok"
+    },
+    {
+        "name": "Sajan Shrestha (News TikTok)",
+        "url": "https://www.tiktok.com/@saabornepal",
+        "rss": None,
+        "tiktok": "saabornepal",
+        "web_fallback": "https://english.onlinekhabar.com/category/social",
+        "category": "tiktok"
+    },
+
+    # ── LinkedIn News / Business ──
+    {
+        "name": "Nepal Economic Forum",
+        "url": "https://www.linkedin.com/company/nepal-economic-forum/",
+        "rss": None,
+        "linkedin": True,
+        "web_fallback": "https://nepaleconomicforum.org/",
+        "category": "linkedin"
+    },
+    {
+        "name": "Invest Nepal",
+        "url": "https://www.linkedin.com/company/invest-nepal/",
+        "rss": None,
+        "linkedin": True,
+        "web_fallback": "https://english.onlinekhabar.com/category/business",
+        "category": "linkedin"
     },
 
     # ── Gold & Silver Prices ──
@@ -145,7 +185,7 @@ NEWS_SOURCES = [
         "category": "stock"
     },
     {
-        "name": "NepseAlpha",
+        "name": "NepseAlpha News",
         "url": "https://nepsealpha.com/news",
         "rss": None,
         "category": "stock"
@@ -184,6 +224,6 @@ GOLD_ENABLED = True
 GOLD_API_URL = os.getenv("GOLD_API_URL", "https://www.ashesh.com.np/gold/")
 
 # ─── REPORT SETTINGS ─────────────────────────────────────────
-MAX_ARTICLES_PER_REPORT = 30  # Increased for more categories
+MAX_ARTICLES_PER_REPORT = 40  # Increased for more categories
 REPORT_LANGUAGE = "english"
 DATA_DIR = "data"
