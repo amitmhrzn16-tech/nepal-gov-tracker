@@ -1,17 +1,20 @@
 """
 Nepal Government News Tracker — Main Scheduler & Orchestrator
 Runs the full pipeline: Scrape → Analyze → Report → Notify
+Uses APScheduler for reliable cron-based scheduling.
 Includes a lightweight HTTP health check server for Railway/cloud hosting.
 """
 
 import os
 import sys
-import time
+import json
 import signal
 import logging
 import threading
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 import config
 from scraper import NewsScraper
@@ -34,9 +37,11 @@ logger = logging.getLogger("NepalGovTracker")
 app_state = {
     "status": "starting",
     "last_run": None,
+    "next_run": None,
     "articles_found": 0,
     "total_cycles": 0,
     "started_at": datetime.now().isoformat(),
+    "last_error": None,
 }
 
 # ─── Health Check Server (keeps Railway happy) ───────────────
@@ -47,15 +52,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        import json
-        response = json.dumps({
-            "status": "running",
-            "service": "Nepal Government News Tracker",
-            "last_run": app_state["last_run"],
-            "total_cycles": app_state["total_cycles"],
-            "articles_last_cycle": app_state["articles_found"],
-            "started_at": app_state["started_at"],
-        })
+        response = json.dumps(app_state, indent=2)
         self.wfile.write(response.encode())
 
     def log_message(self, format, *args):
@@ -70,18 +67,6 @@ def start_health_server():
     server.serve_forever()
 
 
-# ─── Graceful Shutdown ────────────────────────────────────────
-running = True
-
-def shutdown_handler(signum, frame):
-    global running
-    logger.info("Shutdown signal received. Stopping after current cycle...")
-    running = False
-
-signal.signal(signal.SIGINT, shutdown_handler)
-signal.signal(signal.SIGTERM, shutdown_handler)
-
-
 # ─── Pipeline ─────────────────────────────────────────────────
 def run_pipeline():
     """Execute one full cycle: scrape → generate report → send notifications."""
@@ -90,45 +75,54 @@ def run_pipeline():
     logger.info(f"STARTING NEWS CYCLE — {cycle_start.strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("=" * 60)
 
-    # Step 1: Scrape
-    logger.info("[1/3] Scraping news sources...")
-    scraper = NewsScraper()
-    articles = scraper.scrape_all()
+    try:
+        # Step 1: Scrape
+        logger.info("[1/3] Scraping news sources...")
+        scraper = NewsScraper()
+        articles = scraper.scrape_all()
 
-    app_state["articles_found"] = len(articles)
+        app_state["articles_found"] = len(articles)
 
-    if not articles:
-        logger.info("No new articles found. Skipping report generation.")
-        logger.info(f"Next cycle in {config.RUN_INTERVAL_MINUTES} minutes.\n")
-        return
+        if not articles:
+            logger.info("No new articles found. Skipping report generation.")
+            app_state["total_cycles"] += 1
+            app_state["last_run"] = datetime.now().isoformat()
+            return
 
-    logger.info(f"Found {len(articles)} new articles")
+        logger.info(f"Found {len(articles)} new articles")
 
-    # Step 2: Generate Report
-    logger.info("[2/3] Generating AI-powered report...")
-    generator = ReportGenerator()
-    report = generator.generate(articles)
-    logger.info(f"Report generated: {report['subject']}")
+        # Step 2: Generate Report
+        logger.info("[2/3] Generating AI-powered report...")
+        generator = ReportGenerator()
+        report = generator.generate(articles)
+        logger.info(f"Report generated: {report['subject']}")
 
-    # Step 3: Send Notifications
-    logger.info("[3/3] Sending notifications...")
+        # Step 3: Send Notifications
+        logger.info("[3/3] Sending notifications...")
 
-    email_notifier = EmailNotifier()
-    slack_notifier = SlackNotifier()
+        email_notifier = EmailNotifier()
+        slack_notifier = SlackNotifier()
 
-    email_ok = email_notifier.send(report)
-    slack_ok = slack_notifier.send(report)
+        email_ok = email_notifier.send(report)
+        slack_ok = slack_notifier.send(report)
 
-    # Save report locally as backup
-    save_report_locally(report)
+        # Save report locally as backup
+        save_report_locally(report)
 
-    # Summary
-    elapsed = (datetime.now() - cycle_start).total_seconds()
-    logger.info(f"Cycle complete in {elapsed:.1f}s — "
-                f"Articles: {len(articles)} | "
-                f"Email: {'OK' if email_ok else 'FAIL'} | "
-                f"Slack: {'OK' if slack_ok else 'FAIL'}")
-    logger.info(f"Next cycle in {config.RUN_INTERVAL_MINUTES} minutes.\n")
+        # Summary
+        elapsed = (datetime.now() - cycle_start).total_seconds()
+        logger.info(f"Cycle complete in {elapsed:.1f}s — "
+                    f"Articles: {len(articles)} | "
+                    f"Email: {'OK' if email_ok else 'FAIL'} | "
+                    f"Slack: {'OK' if slack_ok else 'FAIL'}")
+
+        app_state["total_cycles"] += 1
+        app_state["last_run"] = datetime.now().isoformat()
+        app_state["last_error"] = None
+
+    except Exception as e:
+        logger.error(f"Pipeline error: {e}", exc_info=True)
+        app_state["last_error"] = f"{type(e).__name__}: {str(e)}"
 
 
 def save_report_locally(report: dict):
@@ -147,9 +141,11 @@ def save_report_locally(report: dict):
 
 # ─── Entry Point ──────────────────────────────────────────────
 def main():
+    interval = config.RUN_INTERVAL_MINUTES
+
     logger.info("=" * 60)
     logger.info("  NEPAL GOVERNMENT NEWS TRACKER")
-    logger.info(f"  Interval: Every {config.RUN_INTERVAL_MINUTES} minutes")
+    logger.info(f"  Schedule: Every {interval} minutes (APScheduler)")
     logger.info(f"  Sources: {len(config.NEWS_SOURCES)} configured")
     logger.info(f"  Email: {'ON' if config.EMAIL_ENABLED else 'OFF'}")
     logger.info(f"  Slack: {'ON' if config.SLACK_ENABLED else 'OFF'}")
@@ -167,23 +163,45 @@ def main():
         run_pipeline()
         return
 
-    # Continuous mode
-    while running:
-        try:
-            run_pipeline()
-            app_state["total_cycles"] += 1
-            app_state["last_run"] = datetime.now().isoformat()
-        except Exception as e:
-            logger.error(f"Pipeline error: {e}", exc_info=True)
+    # ─── APScheduler (reliable cron-based scheduling) ─────────
+    scheduler = BackgroundScheduler()
 
-        # Wait for next cycle
-        if running:
-            logger.info(f"Sleeping for {config.RUN_INTERVAL_MINUTES} minutes...")
-            for _ in range(config.RUN_INTERVAL_MINUTES * 60):
-                if not running:
-                    break
-                time.sleep(1)
+    # Run pipeline every N minutes
+    scheduler.add_job(
+        run_pipeline,
+        trigger=IntervalTrigger(minutes=interval),
+        id="news_pipeline",
+        name=f"Nepal Gov News Pipeline (every {interval}min)",
+        max_instances=1,  # Prevent overlapping runs
+        misfire_grace_time=300,  # Allow 5 min grace for missed runs
+    )
 
+    scheduler.start()
+    logger.info(f"Scheduler started — pipeline will run every {interval} minutes")
+
+    # Run first cycle immediately
+    logger.info("Running first cycle now...")
+    run_pipeline()
+
+    # Update next run time in status
+    job = scheduler.get_job("news_pipeline")
+    if job and job.next_run_time:
+        app_state["next_run"] = job.next_run_time.isoformat()
+        logger.info(f"Next scheduled run: {job.next_run_time}")
+
+    # Keep main thread alive
+    shutdown_event = threading.Event()
+
+    def shutdown_handler(signum, frame):
+        logger.info("Shutdown signal received...")
+        scheduler.shutdown(wait=False)
+        shutdown_event.set()
+
+    signal.signal(signal.SIGINT, shutdown_handler)
+    signal.signal(signal.SIGTERM, shutdown_handler)
+
+    # Block until shutdown
+    shutdown_event.wait()
     logger.info("Tracker stopped. Goodbye!")
 
 
