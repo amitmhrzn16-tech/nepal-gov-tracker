@@ -193,8 +193,8 @@ Rules:
                 f'</div></div>\n'
             )
 
-            # News cards
-            for a in items[:6]:
+            # News cards — show ALL articles
+            for a in items:
                 url = a.get("full_article_url", a["url"])
                 summary = a.get("summary", "")[:120]
                 source = a.get("source", "")
@@ -273,7 +273,7 @@ Rules:
             lines.append(f"{cfg['label'].upper()}")
             lines.append(f"{'─' * 40}")
 
-            for a in items[:6]:
+            for a in items:
                 url = a.get("full_article_url", a["url"])
                 summary = a.get("summary", "")[:120]
                 lines.append(f"\n  {a['title'][:90]}")
@@ -314,7 +314,7 @@ Rules:
             emoji = emojis.get(cat, ":newspaper:")
 
             text = f"*{emoji} {cfg['label']}*\n"
-            for a in items[:4]:
+            for a in items:
                 url = a.get("full_article_url", a["url"])
                 summary = a.get("summary", "")[:80]
                 text += f"\n> *<{url}|{a['title'][:70]}>*"

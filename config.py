@@ -224,6 +224,6 @@ GOLD_ENABLED = True
 GOLD_API_URL = os.getenv("GOLD_API_URL", "https://www.ashesh.com.np/gold/")
 
 # ─── REPORT SETTINGS ─────────────────────────────────────────
-MAX_ARTICLES_PER_REPORT = 40  # Increased for more categories
+MAX_ARTICLES_PER_REPORT = 100  # Show all articles across all categories
 REPORT_LANGUAGE = "english"
 DATA_DIR = "data"

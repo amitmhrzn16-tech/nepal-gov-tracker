@@ -246,7 +246,7 @@ class NewsScraper:
             logger.info(f"[{source['name']}] Stock news: {len(articles)} articles found")
         except Exception as e:
             logger.error(f"Stock scrape error for {source['name']}: {e}")
-        return articles[:10]
+        return articles[:15]
 
     # ─── Social Media Fallback (Instagram, TikTok, LinkedIn) ─
     def _scrape_social_fallback(self, source: dict, platform: str) -> list[dict]:
@@ -313,7 +313,7 @@ class NewsScraper:
         except Exception as e:
             logger.error(f"{platform.capitalize()} fallback error for {source['name']}: {e}")
 
-        return articles[:10]
+        return articles[:15]
 
     # ─── Gold Price Scraping ──────────────────────────────────
     def _scrape_gold_price(self, source: dict) -> list[dict]:
