@@ -1,13 +1,13 @@
 """
 Nepal Government News Tracker — AI Report Generator
-Uses Claude API to generate structured, summarized news reports.
-Now includes Gold Prices, Tech News, Instagram sources, and full article links.
+Uses Google Gemini (FREE) to generate structured, summarized news reports.
+Includes Gold Prices, Tech News, Instagram sources, and full article links.
 """
 
 import re
 import logging
 from datetime import datetime
-from anthropic import Anthropic
+from google import genai
 
 import config
 
@@ -15,24 +15,24 @@ logger = logging.getLogger(__name__)
 
 
 class ReportGenerator:
-    """Generates AI-powered news reports using Claude."""
+    """Generates AI-powered news reports using Google Gemini (free)."""
 
     def __init__(self):
-        key = config.ANTHROPIC_API_KEY
-        if key == "your-anthropic-api-key" or not key:
-            logger.error("ANTHROPIC_API_KEY is NOT set! Add it to Railway Variables.")
+        key = config.GEMINI_API_KEY
+        if key == "your-gemini-api-key" or not key:
+            logger.error("GEMINI_API_KEY is NOT set! Add it to Railway Variables.")
+            logger.error("Get a FREE key at: https://aistudio.google.com/apikey")
+            self.client = None
         else:
-            masked = key[:10] + "..." + key[-4:]
-            logger.info(f"Anthropic API key loaded: {masked}")
-            logger.info(f"Using model: {config.CLAUDE_MODEL}")
-
-        self.client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
+            masked = key[:8] + "..." + key[-4:]
+            logger.info(f"Gemini API key loaded: {masked}")
+            logger.info(f"Using model: {config.GEMINI_MODEL}")
+            self.client = genai.Client(api_key=key)
 
     def generate(self, articles: list[dict]) -> dict:
         if not articles:
             return self._empty_report()
 
-        # Group articles by category
         grouped = self._group_by_category(articles)
         articles_text = self._format_articles_for_prompt(articles)
         timestamp = datetime.now().strftime("%B %d, %Y — %I:%M %p")
@@ -67,20 +67,22 @@ Rules:
 - For gold prices, show the actual numbers if available in the data"""
 
         try:
-            logger.info(f"Calling Claude API (model: {config.CLAUDE_MODEL})...")
-            response = self.client.messages.create(
-                model=config.CLAUDE_MODEL,
-                max_tokens=2000,
-                messages=[{"role": "user", "content": prompt}]
+            if not self.client:
+                raise ValueError("Gemini client not initialized — API key missing")
+
+            logger.info(f"Calling Gemini API (model: {config.GEMINI_MODEL})...")
+            response = self.client.models.generate_content(
+                model=config.GEMINI_MODEL,
+                contents=prompt,
             )
-            report_text = response.content[0].text
-            logger.info(f"Claude API success! Report length: {len(report_text)} chars")
+            report_text = response.text
+            logger.info(f"Gemini API success! Report length: {len(report_text)} chars")
         except Exception as e:
-            logger.error(f"CLAUDE API FAILED: {type(e).__name__}: {e}")
+            logger.error(f"GEMINI API FAILED: {type(e).__name__}: {e}")
             logger.error("Possible fixes:\n"
-                        "  1. Check ANTHROPIC_API_KEY is correct in Railway Variables\n"
-                        "  2. Make sure your API account has credits at console.anthropic.com\n"
-                        "  3. The key should start with 'sk-ant-'")
+                        "  1. Get a FREE key at https://aistudio.google.com/apikey\n"
+                        "  2. Set GEMINI_API_KEY in Railway Variables\n"
+                        "  3. No credit card needed — it's completely free")
             report_text = self._fallback_report(articles)
 
         # Build article links section
@@ -129,7 +131,6 @@ Rules:
             "instagram": "Trending (Social Media)",
         }
 
-        # Group
         grouped = {}
         for a in articles:
             cat = a.get("category", "general")
@@ -230,7 +231,7 @@ Rules:
   </div>
   <div style="background:white;padding:16px 24px;border-radius:0 0 12px 12px;border-top:1px solid #eee;text-align:center;">
     <p style="color:#888;font-size:12px;margin:0;">
-      Automated report by Nepal News Tracker | Powered by Claude AI<br>
+      Automated report by Nepal News Tracker | Powered by Gemini AI<br>
       <span style="font-size:11px;">Sources: Kathmandu Post, Republica, Himalayan Times, RONB, Ashesh Gold, Techmandu &amp; more</span>
     </p>
   </div>
@@ -268,7 +269,7 @@ Rules:
                     "type": "context",
                     "elements": [{
                         "type": "mrkdwn",
-                        "text": ":robot_face: _Nepal News Tracker | Powered by Claude AI_"
+                        "text": ":robot_face: _Nepal News Tracker | Powered by Gemini AI_"
                     }]
                 }
             ]
@@ -291,7 +292,7 @@ Rules:
         }
 
     def _fallback_report(self, articles: list[dict]) -> str:
-        """Categorized report if Claude API fails."""
+        """Categorized report if Gemini API fails."""
         categories = {
             "government": [], "politics": [], "gold": [],
             "tech": [], "instagram": [], "general": [],
@@ -328,30 +329,3 @@ Rules:
                 lines.append(f"  Read: {url}\n")
 
         return "\n".join(lines)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    sample = [
-        {
-            "title": "Nepal Cabinet approves new fiscal year budget",
-            "url": "https://example.com/1",
-            "summary": "The Nepal government approved a budget focusing on infrastructure.",
-            "published": datetime.now().isoformat(),
-            "source": "The Kathmandu Post",
-            "category": "government",
-            "full_article_url": "https://example.com/1",
-        },
-        {
-            "title": "Gold price rises to NPR 135,000 per tola",
-            "url": "https://ashesh.com.np/gold/",
-            "summary": "Hallmark: NPR 135,000 | Tajabi: NPR 134,500 | Silver: NPR 1,800",
-            "published": datetime.now().isoformat(),
-            "source": "Nepal Gold Price (Ashesh)",
-            "category": "gold",
-            "full_article_url": "https://ashesh.com.np/gold/",
-        },
-    ]
-    gen = ReportGenerator()
-    report = gen.generate(sample)
-    print(report["plain_text"])

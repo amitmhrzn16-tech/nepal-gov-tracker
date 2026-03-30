@@ -5,11 +5,11 @@ Reads from environment variables (for cloud deployment) with local fallbacks.
 
 import os
 
-# ─── ANTHROPIC (Claude AI for summarization) ───────────────────
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "your-anthropic-api-key")
-# Get from https://console.anthropic.com
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
-# Safe default that works on all API plans
+# ─── GOOGLE GEMINI (Free AI for summarization) ───────────────────
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your-gemini-api-key")
+# Get FREE from https://aistudio.google.com/apikey (no credit card needed)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+# Free tier: 1500 requests/day, 15 requests/minute
 
 # ─── EMAIL SETTINGS (Gmail SMTP) ──────────────────────────────
 EMAIL_ENABLED = True
