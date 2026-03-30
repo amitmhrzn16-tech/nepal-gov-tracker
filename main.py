@@ -1,13 +1,17 @@
 """
 Nepal Government News Tracker — Main Scheduler & Orchestrator
 Runs the full pipeline: Scrape → Analyze → Report → Notify
+Includes a lightweight HTTP health check server for Railway/cloud hosting.
 """
 
+import os
 import sys
 import time
 import signal
 import logging
+import threading
 from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import config
 from scraper import NewsScraper
@@ -25,6 +29,46 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("NepalGovTracker")
+
+# ─── App State (shared with health check) ────────────────────
+app_state = {
+    "status": "starting",
+    "last_run": None,
+    "articles_found": 0,
+    "total_cycles": 0,
+    "started_at": datetime.now().isoformat(),
+}
+
+# ─── Health Check Server (keeps Railway happy) ───────────────
+class HealthHandler(BaseHTTPRequestHandler):
+    """Minimal HTTP handler so Railway knows the app is alive."""
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        import json
+        response = json.dumps({
+            "status": "running",
+            "service": "Nepal Government News Tracker",
+            "last_run": app_state["last_run"],
+            "total_cycles": app_state["total_cycles"],
+            "articles_last_cycle": app_state["articles_found"],
+            "started_at": app_state["started_at"],
+        })
+        self.wfile.write(response.encode())
+
+    def log_message(self, format, *args):
+        pass  # Suppress default HTTP logs
+
+
+def start_health_server():
+    """Start the health check server on the PORT Railway assigns."""
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    logger.info(f"Health check server running on port {port}")
+    server.serve_forever()
+
 
 # ─── Graceful Shutdown ────────────────────────────────────────
 running = True
@@ -50,6 +94,8 @@ def run_pipeline():
     logger.info("[1/3] Scraping news sources...")
     scraper = NewsScraper()
     articles = scraper.scrape_all()
+
+    app_state["articles_found"] = len(articles)
 
     if not articles:
         logger.info("No new articles found. Skipping report generation.")
@@ -87,7 +133,6 @@ def run_pipeline():
 
 def save_report_locally(report: dict):
     """Save each report as an HTML file for backup/archive."""
-    import os
     archive_dir = os.path.join(config.DATA_DIR, "reports")
     os.makedirs(archive_dir, exist_ok=True)
 
@@ -110,6 +155,13 @@ def main():
     logger.info(f"  Slack: {'ON' if config.SLACK_ENABLED else 'OFF'}")
     logger.info("=" * 60)
 
+    # Start health check server in background thread
+    # (Railway needs an HTTP server to know the app is alive)
+    health_thread = threading.Thread(target=start_health_server, daemon=True)
+    health_thread.start()
+
+    app_state["status"] = "running"
+
     # Check for --once flag (run single cycle and exit)
     if "--once" in sys.argv:
         logger.info("Running single cycle (--once mode)")
@@ -120,6 +172,8 @@ def main():
     while running:
         try:
             run_pipeline()
+            app_state["total_cycles"] += 1
+            app_state["last_run"] = datetime.now().isoformat()
         except Exception as e:
             logger.error(f"Pipeline error: {e}", exc_info=True)
 
