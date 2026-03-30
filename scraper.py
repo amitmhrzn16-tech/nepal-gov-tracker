@@ -366,37 +366,84 @@ class NewsScraper:
 
     # ─── Helpers ──────────────────────────────────────────────
     def _filter_today_only(self, articles: list[dict]) -> list[dict]:
-        """Keep only articles published today. For articles without a parseable
-        date (web-scraped), we check if the URL or title contains today's date
-        patterns; if not determinable we keep them (benefit of the doubt for
-        freshly scraped pages that list current articles)."""
+        """STRICT filter: only keep articles published TODAY.
+        For web-scraped articles without dates, check if URL contains
+        today's date. If no date can be determined, check the URL for
+        date patterns — drop if it contains an old date."""
         today = datetime.now().date()
-        today_str = today.isoformat()  # 2026-03-30
+        today_strs = [
+            today.isoformat(),                          # 2026-03-30
+            today.strftime("%Y/%m/%d"),                  # 2026/03/30
+            today.strftime("%d-%m-%Y"),                  # 30-03-2026
+            today.strftime("%d/%m/%Y"),                  # 30/03/2026
+            today.strftime("%B-%d").lower(),              # march-30
+            today.strftime("%b-%d").lower(),              # mar-30
+        ]
+        # Year+month for URLs like /2026/03/article-name
+        today_year_month = today.strftime("%Y/%m")
+        today_year_month_dash = today.strftime("%Y-%m")
+
         kept = []
+        dropped = 0
 
         for a in articles:
             pub = a.get("published", "")
+            url = a.get("url", "").lower()
+            category = a.get("category", "")
 
-            # Try to parse the published date
+            # Gold prices are always "today" since we scrape live prices
+            if category == "gold":
+                kept.append(a)
+                continue
+
+            # ── Strategy 1: Parse the published date ──
             try:
                 pub_date = datetime.fromisoformat(pub).date()
                 if pub_date == today:
                     kept.append(a)
-                    continue
-                # If the date is clearly old (>1 day ago), skip it
-                if (today - pub_date).days > 1:
-                    continue
-                # If it's yesterday (could be timezone edge case), keep it
-                kept.append(a)
+                else:
+                    dropped += 1
                 continue
             except (ValueError, TypeError):
                 pass
 
-            # For web-scraped articles with no real date,
-            # keep them since we're scraping "latest" pages
-            # that typically show today's content
-            kept.append(a)
+            # ── Strategy 2: Check URL for today's date ──
+            if any(ds in url for ds in today_strs):
+                kept.append(a)
+                continue
 
+            # Check URL has this month/year (e.g. /2026/03/)
+            if today_year_month in url or today_year_month_dash in url:
+                kept.append(a)
+                continue
+
+            # ── Strategy 3: Check if URL contains an OLD date ──
+            # If URL has a date pattern that's NOT today, it's old — drop it
+            old_date_match = re.search(r'(\d{4})[/-](\d{2})[/-](\d{2})', url)
+            if old_date_match:
+                try:
+                    url_date = datetime(
+                        int(old_date_match.group(1)),
+                        int(old_date_match.group(2)),
+                        int(old_date_match.group(3))
+                    ).date()
+                    if url_date != today:
+                        dropped += 1
+                        continue
+                except ValueError:
+                    pass
+
+            # ── Strategy 4: No date info at all ──
+            # For stock/tech/social pages that list current headlines
+            # without dates in URLs, keep them (these pages show latest)
+            if category in ("stock", "tech", "instagram", "tiktok", "linkedin"):
+                kept.append(a)
+            else:
+                # For gov/politics, be strict — drop if no date proof
+                dropped += 1
+
+        if dropped > 0:
+            logger.info(f"Date filter: kept {len(kept)}, dropped {dropped} old articles")
         return kept
 
     def _filter_relevant(self, articles: list[dict]) -> list[dict]:
